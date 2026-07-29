@@ -6,6 +6,10 @@
 
 <!-- demo GIF goes here (P5) -->
 
+> **Status:** Terraform → k3s on AWS ✅ · ArgoCD GitOps loop live ✅ ·
+> ingress/TLS/observability, R2 backups, and CI in progress — follow the
+> [Issues](../../issues).
+
 ## Architecture
 
 ```mermaid
@@ -64,7 +68,8 @@ all declarative, all reconciled by ArgoCD.
 ## Backups & restore
 
 Nightly etcd snapshots ship to Cloudflare R2 via k3s's native S3 support.
-Restore procedure documented in [docs/restore.md](docs/restore.md) — and tested.
+Restore procedure will be documented in [docs/restore.md](docs/restore.md) and
+tested before this section loses the word "will".
 
 ## Teardown
 
