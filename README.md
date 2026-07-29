@@ -2,7 +2,7 @@
 
 > One command from an empty cloud account to a production-grade Kubernetes
 > cluster — GitOps-managed, TLS-secured, fully observable, with automated,
-> tested backups. Runs free forever on OCI's Always Free tier.
+> tested backups. Runs on AWS free-plan credits; provider-portable by design.
 
 <!-- demo GIF goes here (P5) -->
 
@@ -14,7 +14,7 @@
 
 ```mermaid
 flowchart LR
-    TF[Terraform] -->|provisions| VM[OCI A1 VM<br/>cloud-init installs k3s]
+    TF[Terraform] -->|provisions| VM[AWS EC2 VM<br/>cloud-init installs k3s]
     VM --> ARGO[ArgoCD]
     ARGO -->|app-of-apps| APPS
     subgraph APPS[GitOps-managed apps]
@@ -36,7 +36,7 @@ Everything after the VM exists only as YAML in this repo. ArgoCD watches
 ```bash
 git clone https://github.com/Mesharimd/production-cluster-in-a-box
 cd production-cluster-in-a-box/terraform
-cp terraform.tfvars.example terraform.tfvars   # add your OCI credentials
+cp terraform.tfvars.example terraform.tfvars   # set your AWS profile + SSH key
 terraform apply                                 # ~5 min: VM + network + k3s
 cd .. && ./scripts/bootstrap.sh                 # kubeconfig + ArgoCD + root app
 ```
@@ -62,8 +62,10 @@ all declarative, all reconciled by ArgoCD.
   multi-node cost.
 - **Why app-of-apps:** the cluster's entire state is this repo. Rebuild =
   `terraform apply` + bootstrap; drift is auto-healed.
-- **Why OCI A1:** 4 OCPU / 24 GB, free forever — a permanent live demo
-  that costs $0/month. (DigitalOcean fallback documented in `terraform/`.)
+- **Why AWS `c7i-flex.large`:** free-plan-eligible (2 vCPU / 4 GB), runs the
+  full stack on new-account credits — and AWS is the provider this cluster's
+  audience actually runs. The design is provider-portable: an OCI Always Free
+  variant is on the roadmap, and moving is `terraform apply` + bootstrap.
 
 ## Backups & restore
 
