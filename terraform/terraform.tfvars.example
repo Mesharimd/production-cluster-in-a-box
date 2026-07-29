@@ -1,0 +1,16 @@
+# Copy this file to terraform.tfvars and replace every placeholder locally.
+# terraform.tfvars is gitignored and must never be committed.
+
+aws_profile    = "your-aws-cli-profile"
+ssh_public_key = "~/.ssh/your-key.pub"
+
+# Defaults to eu-central-1 when omitted.
+# region = "eu-central-1"
+
+# Defaults to t3.medium when omitted.
+# instance_type = "t3.medium"
+
+# Strongly recommended: replace this documentation-only address with your
+# current public IPv4 address followed by /32. The variable defaults to
+# 0.0.0.0/0 only for initial accessibility.
+ssh_ingress_cidr = "203.0.113.10/32"
