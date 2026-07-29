@@ -20,3 +20,4 @@ kubeconfig*
 
 # local agent briefing — not part of the public repo
 AGENT-PLAN.md
+DESIGN-NOTES-PRIVATE.md
