@@ -4,4 +4,4 @@ packages:
   - curl
 
 runcmd:
-  - [bash, -o, pipefail, -c, "curl -sfL https://get.k3s.io | sh -s - server --cluster-init --disable traefik --write-kubeconfig-mode 0640 --write-kubeconfig-group ubuntu"]
+  - [bash, -o, pipefail, -c, "curl -sfL https://get.k3s.io | sh -s - server --cluster-init --disable traefik --tls-san ${tls_san} --write-kubeconfig-mode 0640 --write-kubeconfig-group ubuntu"]

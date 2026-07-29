@@ -40,7 +40,9 @@ resource "aws_instance" "k3s" {
   vpc_security_group_ids = [aws_security_group.k3s.id]
   key_name               = aws_key_pair.k3s.key_name
 
-  user_data                   = templatefile("${path.module}/cloud-init.yaml.tftpl", {})
+  user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
+    tls_san = aws_eip.k3s.public_ip
+  })
   user_data_replace_on_change = true
 
   root_block_device {
@@ -71,12 +73,16 @@ resource "aws_instance" "k3s" {
 }
 
 resource "aws_eip" "k3s" {
-  domain   = "vpc"
-  instance = aws_instance.k3s.id
+  domain = "vpc"
 
   depends_on = [aws_internet_gateway.main]
 
   tags = {
     Name = "production-cluster-in-a-box"
   }
+}
+
+resource "aws_eip_association" "k3s" {
+  allocation_id = aws_eip.k3s.id
+  instance_id   = aws_instance.k3s.id
 }

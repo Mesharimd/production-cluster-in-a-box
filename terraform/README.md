@@ -6,7 +6,7 @@ k3s cluster:
 - a dedicated VPC and public subnet;
 - an internet gateway and public route;
 - a security group allowing inbound TCP 22, 80, and 443 only;
-- one `t3.medium` EC2 instance using the latest Canonical Ubuntu 24.04 amd64 AMI;
+- one `c7i-flex.large` EC2 instance using the latest Canonical Ubuntu 24.04 amd64 AMI;
 - a 30 GB encrypted gp3 root volume; and
 - an Elastic IP that survives instance stops and starts.
 
@@ -81,7 +81,7 @@ terraform destroy
 ## Cost and provider status
 
 The stack is intended to run on AWS new-account credits. At the project plan's
-estimate, a `t3.medium` consumes about USD 30 per month of credit; the 30 GB gp3
+estimate, a `c7i-flex.large` consumes about USD 30 per month of credit; the 30 GB gp3
 volume and public IPv4 address also have charges. Check the current
 [EC2 On-Demand pricing](https://aws.amazon.com/ec2/pricing/on-demand/),
 [EBS pricing](https://aws.amazon.com/ebs/pricing/), and
@@ -92,3 +92,12 @@ The OCI Always Free variant is parked because account signup was blocked. A
 roadmap issue tracks it as a future provider option. The higher-level cluster
 configuration is deliberately provider-portable so the workload can later move
 to OCI or another VPS after AWS credits expire.
+
+## Free-plan account notes (learned in production, 2026-07-29)
+
+- New AWS "free plan" accounts may only launch free-tier-eligible instance
+  types (`aws ec2 describe-instance-types --filters Name=free-tier-eligible,Values=true`).
+  `c7i-flex.large` (2 vCPU / 4 GB) is eligible and is this repo's default.
+- AWS provider v6.x intermittently produced `InvalidHttpRequest: Unable to
+  parse request` errors on EC2 calls in this environment; the provider is
+  pinned to `~> 5.0`, which is stable.

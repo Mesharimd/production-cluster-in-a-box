@@ -7,8 +7,8 @@ ssh_public_key = "~/.ssh/your-key.pub"
 # Defaults to eu-central-1 when omitted.
 # region = "eu-central-1"
 
-# Defaults to t3.medium when omitted.
-# instance_type = "t3.medium"
+# Defaults to c7i-flex.large when omitted.
+# instance_type = "c7i-flex.large"
 
 # Strongly recommended: replace this documentation-only address with your
 # current public IPv4 address followed by /32. The variable defaults to

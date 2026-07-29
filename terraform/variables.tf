@@ -22,7 +22,7 @@ variable "region" {
 variable "instance_type" {
   description = "EC2 instance type for the single-node k3s server."
   type        = string
-  default     = "t3.medium"
+  default     = "c7i-flex.large"
 
   validation {
     condition     = length(trimspace(var.instance_type)) > 0

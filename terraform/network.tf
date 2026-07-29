@@ -88,3 +88,12 @@ resource "aws_vpc_security_group_egress_rule" "all" {
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "-1"
 }
+
+resource "aws_vpc_security_group_ingress_rule" "kube_api" {
+  security_group_id = aws_security_group.k3s.id
+  description       = "Kubernetes API (restricted to operator IP)"
+  cidr_ipv4         = var.ssh_ingress_cidr
+  from_port         = 6443
+  ip_protocol       = "tcp"
+  to_port           = 6443
+}
