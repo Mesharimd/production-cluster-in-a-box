@@ -125,6 +125,10 @@ kubectl top pods -n logging
 
 Loki must have one ready single-binary pod, Promtail must have one ready pod on the single node, and the datasource ConfigMap must exist in `monitoring`. Promtail is deliberately pinned even though it is in maintenance/EOL status because P3 requires it; Grafana Alloy is the future migration target.
 
+The logging design uses Loki chart `18.7.1` in its current `Monolithic` mode (the chart's name for a single binary), filesystem-backed TSDB v13, one 5 GiB `local-path` PVC, and seven-day compactor retention. Gateway, Memcached caches, canary, tests, rules sidecar, MinIO, and every scalable/distributed component are disabled. Grafana and Promtail talk directly to `loki.logging.svc.cluster.local:3100`.
+
+Loki and Promtail request 125m CPU / 320 MiB memory together and are limited to 700m CPU / 640 MiB memory. Promtail chart `6.17.1` is explicitly deprecated and its image is pinned to `3.6.11`; Promtail reached end of life on March 2, 2026. It is present only because P3 requires it, and the next logging-agent change must migrate this DaemonSet to Grafana Alloy.
+
 ## 5. sealed-secrets
 
 Push commit 5, then verify:

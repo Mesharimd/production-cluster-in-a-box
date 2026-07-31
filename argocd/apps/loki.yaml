@@ -1,0 +1,106 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: loki
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://grafana-community.github.io/helm-charts
+    chart: loki
+    targetRevision: 18.7.1
+    helm:
+      releaseName: loki
+      values: |
+        # Monolithic is the current chart name for single-binary mode.
+        deploymentMode: Monolithic
+
+        loki:
+          auth_enabled: false
+          analytics:
+            reporting_enabled: false
+          commonConfig:
+            replication_factor: 1
+          storage:
+            type: filesystem
+          schemaConfig:
+            configs:
+              - from: "2024-04-01"
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+          limits_config:
+            retention_period: 168h
+          compactor:
+            working_directory: /var/loki/compactor
+            retention_enabled: true
+            delete_request_store: filesystem
+          querier:
+            max_concurrent: 2
+
+        singleBinary:
+          replicas: 1
+          sidecar: false
+          podDisruptionBudget:
+            enabled: false
+          persistence:
+            enabled: true
+            storageClass: local-path
+            size: 5Gi
+            enableStatefulSetAutoDeletePVC: true
+            whenDeleted: Retain
+            whenScaled: Retain
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # Single-node trim: direct clients use the Loki ClusterIP Service.
+        gateway:
+          enabled: false
+        chunksCache:
+          enabled: false
+        resultsCache:
+          enabled: false
+        lokiCanary:
+          enabled: false
+        test:
+          enabled: false
+        minio:
+          enabled: false
+        monitoring:
+          dashboards:
+            enabled: false
+          rules:
+            enabled: false
+          alerts:
+            enabled: false
+          serviceMonitor:
+            enabled: false
+
+        # No simple-scalable or distributed-mode workloads.
+        backend:
+          replicas: 0
+        read:
+          replicas: 0
+        write:
+          replicas: 0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: logging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
