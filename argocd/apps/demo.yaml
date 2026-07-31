@@ -161,8 +161,8 @@ metadata:
     app.kubernetes.io/part-of: production-cluster-in-a-box
   annotations:
     argocd.argoproj.io/sync-wave: "71"
-    # Production flip: change only letsencrypt-staging to letsencrypt-prod after staging verification.
-    cert-manager.io/cluster-issuer: letsencrypt-staging
+    # Production flip: change only letsencrypt-prod to letsencrypt-prod after staging verification.
+    cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
   ingressClassName: nginx

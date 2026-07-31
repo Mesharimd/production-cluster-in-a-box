@@ -1,0 +1,34 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: terraform fmt & validate
+        run: |
+          if [ -d terraform ]; then
+            cd terraform
+            terraform fmt -check -recursive
+            terraform init -backend=false
+            terraform validate
+          else
+            echo "terraform/ not present yet (P1) — skipping"
+          fi
+
+      - name: kubeconform on GitOps manifests
+        run: |
+          if [ -d argocd ]; then
+            curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+            ./kubeconform -summary -ignore-missing-schemas argocd/
+          else
+            echo "argocd/ not present yet (P2) — skipping"
+          fi
