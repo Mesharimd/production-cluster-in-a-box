@@ -156,6 +156,8 @@ openssl s_client -connect demo.meshari.xyz:443 -servername demo.meshari.xyz </de
 
 The page must load and name the stack. The certificate should be Ready but intentionally untrusted because it was issued by Let's Encrypt staging.
 
+The demo is one unprivileged nginx pod pinned by image tag and multi-architecture digest. It requests 20m CPU / 32 MiB and is limited to 100m CPU / 64 MiB; it has no service-account token and serves only the Git-tracked ConfigMap page.
+
 ## 7. Grafana ingress and sealed admin credentials
 
 After commit 5 is live, create the real encrypted Grafana manifest by following [`sealed-secrets.md`](sealed-secrets.md). Save it as `argocd/apps/grafana-admin-sealedsecret.yaml`. Before pushing commit 7, add that encrypted file to the still-local final commit:

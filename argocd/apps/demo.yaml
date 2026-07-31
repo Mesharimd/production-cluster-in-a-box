@@ -1,0 +1,183 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  labels:
+    app.kubernetes.io/part-of: production-cluster-in-a-box
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-content
+  namespace: demo
+  annotations:
+    argocd.argoproj.io/sync-wave: "70"
+  labels:
+    app.kubernetes.io/name: demo
+    app.kubernetes.io/part-of: production-cluster-in-a-box
+data:
+  index.html: |-
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Production Cluster in a Box</title>
+        <style>
+          :root { color-scheme: dark; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+          body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #000; color: #f5f5f5; }
+          main { width: min(42rem, calc(100% - 3rem)); border: 1px solid #2a2a2a; padding: 2.5rem; }
+          .status { color: #ffa000; letter-spacing: .12em; text-transform: uppercase; }
+          h1 { margin: .75rem 0 1rem; font-size: clamp(2rem, 7vw, 4.5rem); line-height: .95; }
+          p { color: #b8b8b8; line-height: 1.7; }
+          code { color: #ffa000; }
+        </style>
+      </head>
+      <body>
+        <main>
+          <div class="status">GitOps loop healthy</div>
+          <h1>Production cluster in a box.</h1>
+          <p><code>k3s on AWS</code>, reconciled by Argo CD and secured by cert-manager.</p>
+          <p>Ingress NGINX · Prometheus · Grafana · Loki · Sealed Secrets</p>
+        </main>
+      </body>
+    </html>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo
+  namespace: demo
+  annotations:
+    argocd.argoproj.io/sync-wave: "70"
+  labels:
+    app.kubernetes.io/name: demo
+    app.kubernetes.io/part-of: production-cluster-in-a-box
+spec:
+  replicas: 1
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: demo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: demo
+        app.kubernetes.io/part-of: production-cluster-in-a-box
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nginx
+          image: nginxinc/nginx-unprivileged:1.31.3-alpine3.24@sha256:59ccf0943b0b8e8d9e6ea9039a39555730f544701a655c596f7df7d096c593f5
+          imagePullPolicy: IfNotPresent
+          command:
+            - nginx
+          args:
+            - -g
+            - daemon off;
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+            timeoutSeconds: 2
+            failureThreshold: 3
+          volumeMounts:
+            - name: content
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: content
+          configMap:
+            name: demo-content
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo
+  namespace: demo
+  annotations:
+    argocd.argoproj.io/sync-wave: "70"
+  labels:
+    app.kubernetes.io/name: demo
+    app.kubernetes.io/part-of: production-cluster-in-a-box
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: demo
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: demo
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: demo
+    app.kubernetes.io/part-of: production-cluster-in-a-box
+  annotations:
+    argocd.argoproj.io/sync-wave: "71"
+    # Production flip: change only letsencrypt-staging to letsencrypt-prod after staging verification.
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - demo.meshari.xyz
+      secretName: demo-tls
+  rules:
+    - host: demo.meshari.xyz
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: demo
+                port:
+                  name: http
