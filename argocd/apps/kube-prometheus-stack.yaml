@@ -243,6 +243,8 @@ spec:
 
         prometheusOperator:
           enabled: true
+          tls:
+            enabled: false
           admissionWebhooks:
             enabled: false
           serviceMonitor:
