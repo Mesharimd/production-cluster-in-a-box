@@ -4,7 +4,8 @@ metadata:
   name: kube-prometheus-stack
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "30"
+    # On final-main rebuilds, wait until the wave-55 SealedSecret exists.
+    argocd.argoproj.io/sync-wave: "60"
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -86,64 +87,16 @@ spec:
               resources:
                 requests:
                   storage: 1Gi
-          # k3s local-path uses WaitForFirstConsumer. This read-only Pod binds
-          # the reserved claim without initializing Grafana's database; commit
-          # 7 removes it as Grafana becomes the real consumer.
-          - apiVersion: v1
-            kind: Pod
-            metadata:
-              name: grafana-pvc-binder
-              namespace: monitoring
-              labels:
-                app.kubernetes.io/name: grafana-pvc-binder
-                app.kubernetes.io/part-of: production-cluster-in-a-box
-            spec:
-              automountServiceAccountToken: false
-              restartPolicy: Always
-              terminationGracePeriodSeconds: 5
-              securityContext:
-                runAsNonRoot: true
-                runAsUser: 101
-                runAsGroup: 101
-                seccompProfile:
-                  type: RuntimeDefault
-              containers:
-                - name: binder
-                  image: nginxinc/nginx-unprivileged:1.31.3-alpine3.24@sha256:59ccf0943b0b8e8d9e6ea9039a39555730f544701a655c596f7df7d096c593f5
-                  imagePullPolicy: IfNotPresent
-                  command:
-                    - /bin/sh
-                    - -c
-                    - exec sleep 2147483647
-                  resources:
-                    requests:
-                      cpu: 5m
-                      memory: 8Mi
-                    limits:
-                      cpu: 25m
-                      memory: 16Mi
-                  securityContext:
-                    allowPrivilegeEscalation: false
-                    readOnlyRootFilesystem: true
-                    capabilities:
-                      drop:
-                        - ALL
-                  volumeMounts:
-                    - name: grafana-storage
-                      mountPath: /var/lib/grafana
-                      readOnly: true
-              volumes:
-                - name: grafana-storage
-                  persistentVolumeClaim:
-                    claimName: grafana
-                    readOnly: true
-
         grafana:
-          # Defer Grafana until commit 7 so its persistent database is initialized
-          # exactly once, with the operator-created sealed admin credentials.
-          enabled: false
+          # Enable Grafana only when commit 7 also supplies the operator-created
+          # sealed admin credentials, before its persistent database initializes.
+          enabled: true
           fullnameOverride: grafana
           replicas: 1
+          admin:
+            existingSecret: grafana-admin-credentials
+            userKey: admin-user
+            passwordKey: admin-password
           defaultDashboardsEnabled: true
           defaultDashboardsInterval: 1m
           testFramework:

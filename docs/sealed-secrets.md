@@ -20,6 +20,8 @@ This is a commented example only. The placeholders are not valid ciphertext and 
 # metadata:
 #   name: grafana-admin-credentials
 #   namespace: monitoring
+#   annotations:
+#     argocd.argoproj.io/sync-wave: "55"
 # spec:
 #   encryptedData:
 #     admin-user: <SEALED_CIPHERTEXT>
@@ -33,7 +35,7 @@ This is a commented example only. The placeholders are not valid ciphertext and 
 
 ## Generate the real manifest
 
-Wait until P3 commit 5 is live and `deployment/sealed-secrets-controller` is Ready. Install the `kubeseal` CLI locally, keep the fetched kubeconfig in the repository's ignored `./kubeconfig` file, and run from the repository root:
+Wait until P3 commit 5 is live and `deployment/sealed-secrets-controller` is Ready. Install the `kubeseal` CLI locally with `brew install kubeseal`, keep the fetched kubeconfig in the repository's ignored `./kubeconfig` file, and run from the repository root:
 
 ```bash
 bash
@@ -56,6 +58,9 @@ printf '%s' "$GRAFANA_ADMIN_PASSWORD" \
   --controller-name sealed-secrets-controller \
   --controller-namespace sealed-secrets \
   --format yaml \
+| kubectl annotate --local --filename - \
+  argocd.argoproj.io/sync-wave=55 \
+  --output yaml \
 > argocd/apps/grafana-admin-sealedsecret.yaml
 
 kubeseal \
@@ -63,6 +68,13 @@ kubeseal \
   --controller-namespace sealed-secrets \
   --validate \
 < argocd/apps/grafana-admin-sealedsecret.yaml
+
+ruby -ryaml -e '
+  manifest = YAML.load_file(ARGV.fetch(0))
+  abort "missing SealedSecret sync wave 55" unless manifest.dig(
+    "metadata", "annotations", "argocd.argoproj.io/sync-wave"
+  ) == "55"
+' argocd/apps/grafana-admin-sealedsecret.yaml
 
 if rg -n 'kind: Secret|stringData:|adminPassword:' argocd/apps/; then
   printf 'Refusing to continue: an unsealed secret pattern was found.\n' >&2
@@ -74,7 +86,7 @@ trap - EXIT
 exit
 ```
 
-The pipeline keeps the unsealed Secret off disk and passes the password through standard input rather than a process argument. The password is read silently and is not placed in shell history. Do not enable shell tracing while running these commands. The final `rg` guard must find no unsealed Secret patterns. It is normal for the sealed file to contain the key names `admin-user` and `admin-password`; their values must be long encrypted strings under `spec.encryptedData`.
+The pipeline keeps the unsealed Secret off disk and passes the password through standard input rather than a process argument. The password is read silently and is not placed in shell history. Do not enable shell tracing while running these commands. The local annotation step touches only the encrypted SealedSecret and assigns root-app wave 55. Commit 5 installs the matching CRD at wave 49, so a fresh final-main bootstrap can store the encrypted object even if the controller pod is still starting; the controller reconciles it before Grafana starts at wave 60. The final `rg` guard must find no unsealed Secret patterns. It is normal for the sealed file to contain the key names `admin-user` and `admin-password`; their values must be long encrypted strings under `spec.encryptedData`.
 
 Do not push the generated file by itself. Follow [`p3-rollout.md`](p3-rollout.md): add it to the still-local Grafana ingress commit with `git commit --amend --no-edit`, then push that amended final app commit.
 

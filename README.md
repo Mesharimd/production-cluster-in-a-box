@@ -41,8 +41,11 @@ terraform apply                                 # ~5 min: VM + network + k3s
 cd .. && ./scripts/bootstrap.sh                 # kubeconfig + ArgoCD + root app
 ```
 
-~10 minutes later: Grafana, Loki, TLS ingress, and a demo app — all live,
-all declarative, all reconciled by ArgoCD.
+~10 minutes later: Prometheus, Loki, TLS ingress, and the demo app are live,
+declarative, and reconciled by ArgoCD. Grafana also becomes ready on the
+original cluster, or after its Sealed Secrets key is restored. A brand-new
+cluster with a new sealing key requires the Grafana credential to be resealed;
+see [docs/sealed-secrets.md](docs/sealed-secrets.md).
 
 ## What's included
 
@@ -60,12 +63,13 @@ all declarative, all reconciled by ArgoCD.
 - **Why k3s over kubeadm:** single binary, CNCF-certified, embedded etcd
   enables built-in S3 snapshots — full production semantics without
   multi-node cost.
-- **Why app-of-apps:** the cluster's entire state is this repo. Rebuild =
-  `terraform apply` + bootstrap; drift is auto-healed.
+- **Why app-of-apps:** the cluster's desired application state is this repo,
+  and drift is auto-healed. A full rebuild is `terraform apply` + bootstrap
+  plus restoration of the Sealed Secrets key or resealing encrypted values.
 - **Why AWS `c7i-flex.large`:** free-plan-eligible (2 vCPU / 4 GB), runs the
   full stack on new-account credits — and AWS is the provider this cluster's
-  audience actually runs. The design is provider-portable: an OCI Always Free
-  variant is on the roadmap, and moving is `terraform apply` + bootstrap.
+  audience actually runs. The design is provider-portable, but moving to a
+  fresh cluster also requires restoring or resealing cluster-bound secrets.
 
 ## Backups & restore
 
