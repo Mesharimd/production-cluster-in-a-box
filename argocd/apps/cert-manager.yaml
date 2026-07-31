@@ -1,0 +1,130 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.21.1
+    helm:
+      releaseName: cert-manager
+      values: |
+        crds:
+          enabled: true
+          keep: true
+
+        replicaCount: 1
+        resources:
+          requests:
+            cpu: 20m
+            memory: 64Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+
+        webhook:
+          replicaCount: 1
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+
+        cainjector:
+          enabled: true
+          replicaCount: 1
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+
+        startupapicheck:
+          enabled: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+
+        prometheus:
+          enabled: false
+
+        extraObjects:
+          - |
+            apiVersion: cert-manager.io/v1
+            kind: ClusterIssuer
+            metadata:
+              name: letsencrypt-staging
+              annotations:
+                argocd.argoproj.io/sync-wave: "1"
+            spec:
+              acme:
+                email: mesharidoweesh@gmail.com
+                server: https://acme-staging-v02.api.letsencrypt.org/directory
+                privateKeySecretRef:
+                  name: letsencrypt-staging-account-key
+                solvers:
+                  - http01:
+                      ingress:
+                        ingressClassName: nginx
+                        serviceType: ClusterIP
+                        podTemplate:
+                          spec:
+                            resources:
+                              requests:
+                                cpu: 10m
+                                memory: 32Mi
+                              limits:
+                                cpu: 100m
+                                memory: 64Mi
+          - |
+            apiVersion: cert-manager.io/v1
+            kind: ClusterIssuer
+            metadata:
+              name: letsencrypt-prod
+              annotations:
+                argocd.argoproj.io/sync-wave: "1"
+            spec:
+              acme:
+                email: mesharidoweesh@gmail.com
+                server: https://acme-v02.api.letsencrypt.org/directory
+                privateKeySecretRef:
+                  name: letsencrypt-prod-account-key
+                solvers:
+                  - http01:
+                      ingress:
+                        ingressClassName: nginx
+                        serviceType: ClusterIP
+                        podTemplate:
+                          spec:
+                            resources:
+                              requests:
+                                cpu: 10m
+                                memory: 32Mi
+                              limits:
+                                cpu: 100m
+                                memory: 64Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: cert-manager
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
