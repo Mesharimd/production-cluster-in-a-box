@@ -139,7 +139,7 @@ kubectl -n sealed-secrets rollout status deployment/sealed-secrets-controller --
 kubectl get customresourcedefinition sealedsecrets.bitnami.com
 ```
 
-Read [`sealed-secrets.md`](sealed-secrets.md) before the final Grafana step. Do not commit an unsealed Kubernetes Secret or a plaintext password.
+The controller is pinned to chart `2.19.1` / controller `0.38.4`, with one replica requesting 50m CPU / 64 MiB and limited to 200m CPU / 128 MiB. Metrics rules and ServiceMonitor resources are disabled for this small node. Read [`sealed-secrets.md`](sealed-secrets.md) before the final Grafana step. Do not commit an unsealed Kubernetes Secret or a plaintext password.
 
 ## 6. demo application
 
@@ -164,15 +164,16 @@ After commit 5 is live, create the real encrypted Grafana manifest by following 
 git add argocd/apps/grafana-admin-sealedsecret.yaml
 git commit --amend --no-edit
 git show --stat --oneline HEAD
-git grep -nE 'admin-password:|stringData:|password:' -- ':!docs/sealed-secrets.md'
+rg -n 'kind: Secret|stringData:|adminPassword:' argocd/apps/
 ```
 
-The grep must not reveal plaintext. Recompute commit 7's SHA after the amend, then push that SHA. This keeps the real SealedSecret and the Grafana switch atomic without adding an eighth app commit.
+The `rg` command must return no matches. Recompute commit 7's SHA after the amend, then push that SHA. This keeps the real SealedSecret and the Grafana switch atomic without adding an eighth app commit.
 
 Verify:
 
 ```bash
-kubectl -n monitoring get sealedsecret,grafana-admin-credentials
+kubectl -n monitoring get sealedsecret grafana-admin-credentials
+kubectl -n monitoring get secret grafana-admin-credentials
 kubectl -n monitoring rollout status deployment/grafana --timeout=5m
 kubectl -n monitoring get ingress,certificate,certificaterequest,challenge
 kubectl -n monitoring wait certificate/grafana-tls --for=condition=Ready --timeout=10m
