@@ -1,0 +1,312 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 88.0.1
+    helm:
+      releaseName: monitoring
+      values: |
+        crds:
+          enabled: true
+          upgradeJob:
+            enabled: false
+
+        # Single-node trim: Windows monitoring has no target on this Linux node.
+        windowsMonitoring:
+          enabled: false
+
+        # Single-node trim: alert routing is outside this portfolio demo's scope.
+        alertmanager:
+          enabled: false
+
+        # Keep only recording rules used by the retained Kubernetes dashboards.
+        defaultRules:
+          create: true
+          rules:
+            alertmanager: false
+            etcd: false
+            configReloaders: false
+            general: false
+            k8sContainerCpuUsageSecondsTotal: true
+            k8sContainerMemoryCache: true
+            k8sContainerMemoryRss: true
+            k8sContainerMemorySwap: false
+            k8sContainerResource: true
+            k8sContainerMemoryWorkingSetBytes: true
+            k8sPodOwner: true
+            kubeApiserverAvailability: false
+            kubeApiserverBurnrate: false
+            kubeApiserverHistogram: false
+            kubeApiserverSlos: false
+            kubeControllerManager: false
+            kubelet: false
+            kubeProxy: false
+            kubePrometheusGeneral: true
+            kubePrometheusNodeRecording: true
+            kubernetesApps: false
+            # Alertmanager is disabled, so do not evaluate dead-end alert rules.
+            kubernetesResources: false
+            kubernetesStorage: false
+            kubernetesSystem: false
+            kubeSchedulerAlerting: false
+            kubeSchedulerRecording: false
+            kubeStateMetrics: false
+            network: false
+            node: false
+            nodeExporterAlerting: false
+            nodeExporterRecording: true
+            prometheus: false
+            prometheusOperator: false
+            windows: false
+
+        # Reserve Grafana's volume even while Grafana is deferred. Keeping this
+        # object desired across commits makes a commit-7 rollback data-safe.
+        extraManifests:
+          - apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: grafana
+              namespace: monitoring
+              annotations:
+                argocd.argoproj.io/sync-options: Prune=false,Delete=false
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              storageClassName: local-path
+              resources:
+                requests:
+                  storage: 1Gi
+          # k3s local-path uses WaitForFirstConsumer. This read-only Pod binds
+          # the reserved claim without initializing Grafana's database; commit
+          # 7 removes it as Grafana becomes the real consumer.
+          - apiVersion: v1
+            kind: Pod
+            metadata:
+              name: grafana-pvc-binder
+              namespace: monitoring
+              labels:
+                app.kubernetes.io/name: grafana-pvc-binder
+                app.kubernetes.io/part-of: production-cluster-in-a-box
+            spec:
+              automountServiceAccountToken: false
+              restartPolicy: Always
+              terminationGracePeriodSeconds: 5
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 101
+                runAsGroup: 101
+                seccompProfile:
+                  type: RuntimeDefault
+              containers:
+                - name: binder
+                  image: nginxinc/nginx-unprivileged:1.31.3-alpine3.24@sha256:59ccf0943b0b8e8d9e6ea9039a39555730f544701a655c596f7df7d096c593f5
+                  imagePullPolicy: IfNotPresent
+                  command:
+                    - /bin/sh
+                    - -c
+                    - exec sleep 2147483647
+                  resources:
+                    requests:
+                      cpu: 5m
+                      memory: 8Mi
+                    limits:
+                      cpu: 25m
+                      memory: 16Mi
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    readOnlyRootFilesystem: true
+                    capabilities:
+                      drop:
+                        - ALL
+                  volumeMounts:
+                    - name: grafana-storage
+                      mountPath: /var/lib/grafana
+                      readOnly: true
+              volumes:
+                - name: grafana-storage
+                  persistentVolumeClaim:
+                    claimName: grafana
+                    readOnly: true
+
+        grafana:
+          # Defer Grafana until commit 7 so its persistent database is initialized
+          # exactly once, with the operator-created sealed admin credentials.
+          enabled: false
+          fullnameOverride: grafana
+          replicas: 1
+          defaultDashboardsEnabled: true
+          defaultDashboardsInterval: 1m
+          testFramework:
+            enabled: false
+          persistence:
+            enabled: true
+            existingClaim: grafana
+          initChownData:
+            enabled: true
+            resources:
+              requests:
+                cpu: 10m
+                memory: 8Mi
+              limits:
+                cpu: 50m
+                memory: 32Mi
+          resources:
+            requests:
+              cpu: 75m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 320Mi
+          sidecar:
+            resources:
+              requests:
+                cpu: 10m
+                memory: 16Mi
+              limits:
+                cpu: 50m
+                memory: 48Mi
+            dashboards:
+              enabled: true
+              searchNamespace: monitoring
+            datasources:
+              enabled: true
+              searchNamespace: monitoring
+              alertmanager:
+                enabled: false
+          serviceMonitor:
+            enabled: false
+
+        # Keep only endpoints that map cleanly onto a single-server k3s layout.
+        kubeApiServer:
+          enabled: true
+        kubeControllerManager:
+          enabled: false
+        coreDns:
+          enabled: true
+        kubeDns:
+          enabled: false
+        kubeEtcd:
+          enabled: false
+        kubeScheduler:
+          enabled: false
+        kubeProxy:
+          enabled: false
+
+        kubeStateMetrics:
+          enabled: true
+        kube-state-metrics:
+          replicas: 1
+          collectors:
+            - daemonsets
+            - deployments
+            - ingresses
+            - namespaces
+            - nodes
+            - persistentvolumeclaims
+            - persistentvolumes
+            - pods
+            - replicasets
+            - services
+            - statefulsets
+          selfMonitor:
+            enabled: false
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 96Mi
+
+        nodeExporter:
+          enabled: true
+        prometheus-node-exporter:
+          kubeRBACProxy:
+            enabled: false
+          resources:
+            requests:
+              cpu: 20m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+
+        prometheusOperator:
+          enabled: true
+          admissionWebhooks:
+            enabled: false
+          serviceMonitor:
+            selfMonitor: false
+          resources:
+            requests:
+              cpu: 50m
+              memory: 48Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          prometheusConfigReloader:
+            resources:
+              requests:
+                cpu: 10m
+                memory: 16Mi
+              limits:
+                cpu: 50m
+                memory: 48Mi
+
+        prometheus:
+          enabled: true
+          serviceMonitor:
+            selfMonitor: false
+          prometheusSpec:
+            replicas: 1
+            shards: 1
+            retention: 7d
+            retentionSize: 6GiB
+            scrapeInterval: 60s
+            scrapeTimeout: 10s
+            evaluationInterval: 60s
+            walCompression: true
+            disableAlerting: true
+            enableAdminAPI: false
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                cpu: 750m
+                memory: 768Mi
+            persistentVolumeClaimRetentionPolicy:
+              whenDeleted: Retain
+              whenScaled: Retain
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: local-path
+                  accessModes:
+                    - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: 8Gi
+
+        thanosRuler:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

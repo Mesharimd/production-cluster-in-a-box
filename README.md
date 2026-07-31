@@ -20,7 +20,7 @@ flowchart LR
     subgraph APPS[GitOps-managed apps]
       ING[ingress-nginx]
       CERT[cert-manager + Let's Encrypt]
-      MON[Prometheus + Grafana + Alertmanager]
+      MON[Prometheus + Grafana]
       LOKI[Loki + Promtail]
       SEAL[sealed-secrets]
       DEMO[demo app]
@@ -51,7 +51,7 @@ all declarative, all reconciled by ArgoCD.
 | **k3s** (single node, embedded etcd) | Production-certified K8s in one binary, right-sized for one VM |
 | **ArgoCD app-of-apps** | One root Application installs everything; `prune` + `selfHeal` on |
 | **ingress-nginx + cert-manager** | Real TLS via Let's Encrypt on real subdomains |
-| **kube-prometheus-stack + Loki** | Metrics, dashboards, alerts, and logs in one Grafana |
+| **kube-prometheus-stack + Loki** | Metrics, dashboards, and logs in one Grafana |
 | **sealed-secrets** | Secrets live in git safely; nothing sensitive in plaintext |
 | **etcd → R2 snapshots** | Nightly cluster-state backups, S3-compatible, restore documented |
 

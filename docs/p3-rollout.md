@@ -72,16 +72,44 @@ Push commit 3, then verify:
 kubectl -n argocd get application kube-prometheus-stack
 kubectl -n monitoring get pods
 kubectl -n monitoring get prometheus,alertmanager
+kubectl -n monitoring get deployment grafana # Expected: no resources found until commit 7.
 kubectl -n monitoring get pvc
 kubectl top pods -n monitoring
 kubectl top node
 ```
 
-Every workload must be ready and every PVC bound before continuing. Compare actual memory use with the documented P3 resource budget below; do not proceed if the node is under memory pressure.
+Every workload must be ready and the Prometheus PVC must be bound before continuing. Grafana is intentionally absent at this stage. Compare actual memory use with the documented P3 resource budget below; do not proceed if the node is under memory pressure.
 
 ### Four-gigabyte design budget
 
-The exact requests, limits, disabled components, and aggregate budget are recorded with the monitoring manifest in commit 3. The guiding constraints are seven-day retention, one replica, bounded local storage, no high-availability pretense, and no optional component whose demo value is lower than its single-node cost.
+The full default kube-prometheus-stack is not safe on this 4 GiB node. Commit 3 keeps the useful metrics path while removing or deferring these costs:
+
+- One Prometheus replica and one shard: this is a single-node demo, so extra replicas cannot provide real availability.
+- Alertmanager disabled: there is no P3 notification route, and loading an idle alert pipeline would spend memory without demonstrating delivery.
+- Admission webhooks disabled: version-pinned Helm rendering plus kubeconform is the GitOps validation gate; this avoids another deployment and hook jobs.
+- Only the API server and CoreDNS control-plane monitors retained: k3s embeds etcd, scheduler, controller-manager, and proxy differently from the standalone endpoints assumed by the chart.
+- Recording rules reduced to the container/resource and node-exporter series used by the retained dashboards; broad alert and platform rule groups are disabled.
+- kube-state-metrics restricted to 11 Kubernetes object collectors instead of watching every supported object.
+- Self-monitoring targets, Windows monitoring, Thanos, Grafana tests, and the Grafana Alertmanager datasource disabled.
+- Scrape and evaluation intervals set to 60 seconds instead of collecting demo data at a production-scale cadence.
+- Seven-day retention bounded by a 6 GiB size ceiling on an 8 GiB `local-path` PVC, using the storage provisioner built into k3s.
+- Grafana deferred until commit 7: this avoids a random bootstrap password being persisted in its SQLite database before sealed-secrets is available. Commit 7 creates its separate 1 GiB PVC and starts Grafana for the first time with the sealed admin credentials already referenced.
+
+Steady-state explicit container budgets are:
+
+| Component | CPU request | CPU limit | Memory request | Memory limit |
+| --- | ---: | ---: | ---: | ---: |
+| Prometheus | 200m | 750m | 512 MiB | 768 MiB |
+| Prometheus config reloader | 10m | 50m | 16 MiB | 48 MiB |
+| Prometheus Operator | 50m | 200m | 48 MiB | 128 MiB |
+| kube-state-metrics | 25m | 100m | 32 MiB | 96 MiB |
+| node-exporter | 20m | 100m | 16 MiB | 64 MiB |
+| **Commit 3 monitoring subtotal** | **305m** | **1.2 CPU** | **624 MiB** | **1,104 MiB** |
+| Grafana, added in commit 7 | 75m | 300m | 128 MiB | 320 MiB |
+| Two Grafana sidecars, added in commit 7 | 20m | 100m | 32 MiB | 96 MiB |
+| **Final monitoring total** | **400m** | **1.6 CPU** | **784 MiB** | **1,520 MiB** |
+
+The Grafana ownership init container and Prometheus init reloader are transient and separately bounded at 8/32 MiB and 16/48 MiB respectively. Requests are the scheduling budget; limits are ceilings, not reserved memory. After all P3 apps, the declared steady-state P3 requests total approximately 1.45 GiB, leaving the rest for k3s, Argo CD, the OS, and bursts. The operator must still stop if `kubectl top node` reports sustained memory pressure before logging is added.
 
 ## 4. Loki, Promtail, and Grafana datasource
 

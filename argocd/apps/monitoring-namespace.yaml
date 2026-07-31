@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    # Retain the namespace so a monitoring-app rollback cannot garbage-collect
+    # the protected Grafana and Prometheus claims with namespace deletion.
+    argocd.argoproj.io/sync-options: Prune=false,Delete=false
+  labels:
+    app.kubernetes.io/part-of: production-cluster-in-a-box
