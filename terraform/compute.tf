@@ -41,9 +41,20 @@ resource "aws_instance" "k3s" {
   key_name               = aws_key_pair.k3s.key_name
 
   user_data = templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    tls_san = aws_eip.k3s.public_ip
+    tls_san                     = aws_eip.k3s.public_ip
+    etcd_snapshot_schedule_cron = var.etcd_snapshot_schedule_cron
+    etcd_snapshot_retention     = var.etcd_snapshot_retention
+    r2_endpoint                 = var.r2_endpoint
+    r2_bucket                   = var.r2_bucket
+    r2_region                   = var.r2_region
+    r2_access_key_id            = var.r2_access_key_id
+    r2_secret_access_key        = var.r2_secret_access_key
   })
-  user_data_replace_on_change = true
+
+  # P3 made this instance stateful: it now holds the cluster datastore,
+  # Sealed Secrets key, and Grafana data. Cloud-init changes must never replace
+  # it; live-node configuration is performed through the P4 backup runbook.
+  user_data_replace_on_change = false
 
   root_block_device {
     delete_on_termination = true

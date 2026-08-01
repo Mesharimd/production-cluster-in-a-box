@@ -10,9 +10,11 @@ k3s cluster:
 - a 30 GB encrypted gp3 root volume; and
 - an Elastic IP that survives instance stops and starts.
 
-Cloud-init installs k3s in embedded-etcd mode with Traefik disabled. The
-kubeconfig remains at `/etc/rancher/k3s/k3s.yaml` and is readable by the Ubuntu
-user's group so the Terraform output can provide a working `scp` command.
+Cloud-init installs k3s in embedded-etcd mode with Traefik disabled. Before
+installation, it writes a root-only k3s configuration that schedules nightly
+etcd snapshots to the operator's Cloudflare R2 bucket. The kubeconfig remains
+at `/etc/rancher/k3s/k3s.yaml` and is readable by the Ubuntu user's group so the
+Terraform output can provide a working `scp` command.
 
 This stack creates new, isolated resources. It does not import, reference, or
 modify any existing infrastructure.
@@ -22,6 +24,7 @@ modify any existing infrastructure.
 - Terraform 1.5 or newer
 - AWS CLI with an IAM-user profile already configured
 - an existing local SSH key pair
+- a Cloudflare R2 bucket and bucket-scoped Object Read & Write S3 credentials
 
 Copy the example variables file, then replace every placeholder with local
 values:
@@ -32,10 +35,19 @@ cp terraform.tfvars.example terraform.tfvars
 ${EDITOR:-vi} terraform.tfvars
 ```
 
-`terraform.tfvars` is gitignored. Set `ssh_ingress_cidr` to your current public
-IPv4 address with a `/32` suffix whenever possible. Its variable default is
-`0.0.0.0/0` for initial accessibility, which permits SSH attempts from the
-internet and is less secure.
+`terraform.tfvars` is gitignored. R2 credentials are marked sensitive so
+Terraform redacts them from ordinary CLI output, but Terraform still stores
+them in the local state and AWS stores them as EC2 user data. Protect the state
+files, restrict access to the AWS account and node, and never commit either the
+real tfvars or state. Set `ssh_ingress_cidr` to your current public IPv4 address
+with a `/32` suffix whenever possible. Its variable default is `0.0.0.0/0` for
+initial accessibility, which permits SSH attempts from the internet and is
+less secure.
+
+The live post-P3 node is stateful and must not be recreated to deliver a
+cloud-init change. Configure that node through the reviewed
+[P4 backup runbook](../docs/p4-backups.md); Terraform's backup inputs are for
+fresh clusters.
 
 The SSH public-key path should end in `.pub`, with its matching private key at
 the same path without that suffix. Terraform reads only the public key; the

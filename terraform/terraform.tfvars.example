@@ -14,3 +14,14 @@ ssh_public_key = "~/.ssh/your-key.pub"
 # current public IPv4 address followed by /32. The variable defaults to
 # 0.0.0.0/0 only for initial accessibility.
 ssh_ingress_cidr = "203.0.113.10/32"
+
+# Fresh clusters configure nightly embedded-etcd snapshots in Cloudflare R2.
+# Create the bucket and a bucket-scoped Object Read & Write token first. Never
+# commit real values; keep them only in the ignored terraform.tfvars file.
+etcd_snapshot_schedule_cron = "0 3 * * *"
+etcd_snapshot_retention     = 7
+r2_endpoint                 = "your-account-id.r2.cloudflarestorage.com"
+r2_bucket                   = "your-r2-bucket-name"
+r2_region                   = "auto"
+r2_access_key_id            = "your-r2-access-key-id"
+r2_secret_access_key        = "your-r2-secret-access-key"

@@ -2,7 +2,8 @@
 
 > One command from an empty cloud account to a production-grade Kubernetes
 > cluster — GitOps-managed, TLS-secured, fully observable, with automated,
-> tested backups. Runs on AWS free-plan credits; provider-portable by design.
+> scheduled backups and a documented restore path. Runs on AWS free-plan
+> credits; provider-portable by design.
 
 <!-- demo GIF goes here (P5) -->
 
@@ -73,9 +74,15 @@ see [docs/sealed-secrets.md](docs/sealed-secrets.md).
 
 ## Backups & restore
 
-Nightly etcd snapshots ship to Cloudflare R2 via k3s's native S3 support.
-Restore procedure will be documented in [docs/restore.md](docs/restore.md) and
-tested before this section loses the word "will".
+Fresh clusters are configured to send nightly embedded-etcd snapshots to
+Cloudflare R2 through k3s's native S3 support. The existing live cluster must
+be activated and verified manually with the
+[P4 backup runbook](docs/p4-backups.md). The
+[restore procedure](docs/restore.md) is documented but has **not yet been
+tested**; the repository will not claim otherwise until an operator completes
+and records a restore drill. These snapshots protect the Kubernetes datastore,
+including the Sealed Secrets controller key, but not node-local volume data
+such as Grafana's database.
 
 ## Teardown
 

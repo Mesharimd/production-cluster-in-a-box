@@ -3,5 +3,19 @@ package_update: true
 packages:
   - curl
 
+write_files:
+  - path: /etc/rancher/k3s/config.yaml
+    owner: root:root
+    permissions: "0600"
+    content: |
+      etcd-snapshot-schedule-cron: ${jsonencode(etcd_snapshot_schedule_cron)}
+      etcd-snapshot-retention: ${etcd_snapshot_retention}
+      etcd-s3: true
+      etcd-s3-endpoint: ${jsonencode(r2_endpoint)}
+      etcd-s3-bucket: ${jsonencode(r2_bucket)}
+      etcd-s3-region: ${jsonencode(r2_region)}
+      etcd-s3-access-key: ${jsonencode(r2_access_key_id)}
+      etcd-s3-secret-key: ${jsonencode(r2_secret_access_key)}
+
 runcmd:
   - [bash, -o, pipefail, -c, "curl -sfL https://get.k3s.io | sh -s - server --cluster-init --disable traefik --tls-san ${tls_san} --write-kubeconfig-mode 0640 --write-kubeconfig-group ubuntu"]
