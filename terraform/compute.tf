@@ -56,6 +56,13 @@ resource "aws_instance" "k3s" {
   # it; live-node configuration is performed through the P4 backup runbook.
   user_data_replace_on_change = false
 
+  # EC2 only allows user_data modification on a STOPPED instance, so ignore
+  # drift entirely: template changes serve fresh clusters; the live node is
+  # managed via the runbooks.
+  lifecycle {
+    ignore_changes = [user_data]
+  }
+
   root_block_device {
     delete_on_termination = true
     encrypted             = true
