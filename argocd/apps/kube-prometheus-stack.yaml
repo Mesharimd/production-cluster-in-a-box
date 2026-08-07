@@ -28,7 +28,17 @@ spec:
 
         # Single-node trim: alert routing is outside this portfolio demo's scope.
         alertmanager:
-          enabled: false
+          enabled: true
+          alertmanagerSpec:
+            replicas: 1
+            retention: 24h
+            resources:
+              requests:
+                cpu: 10m
+                memory: 48Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
 
         # Keep only recording rules used by the retained Kubernetes dashboards.
         defaultRules:
