@@ -26,9 +26,34 @@ spec:
         windowsMonitoring:
           enabled: false
 
-        # Single-node trim: alert routing is outside this portfolio demo's scope.
+        # Critical alerts route to the k8s-incident-triage bot's webhook. The
+        # quoted "null" receiver and Watchdog route preserve the chart's
+        # default sink; the critical-only matcher keeps the stack's many
+        # default warning rules from paging the bot.
         alertmanager:
           enabled: true
+          config:
+            route:
+              routes:
+                - receiver: "null"
+                  matchers:
+                    - 'alertname = "Watchdog"'
+                - receiver: k8s-incident-triage
+                  group_by:
+                    - alertname
+                    - namespace
+                    - pod
+                  group_wait: 10s
+                  group_interval: 1m
+                  repeat_interval: 5m
+                  matchers:
+                    - 'severity = "critical"'
+            receivers:
+              - name: "null"
+              - name: k8s-incident-triage
+                webhook_configs:
+                  - url: http://k8s-incident-triage.k8s-incident-triage.svc:80/alerts
+                    send_resolved: true
           alertmanagerSpec:
             replicas: 1
             retention: 24h
@@ -65,7 +90,8 @@ spec:
             kubePrometheusGeneral: true
             kubePrometheusNodeRecording: true
             kubernetesApps: false
-            # Alertmanager is disabled, so do not evaluate dead-end alert rules.
+            # Default platform alert rules stay off; only the triage bot's
+            # demo/incident rules should page the critical route.
             kubernetesResources: false
             kubernetesStorage: false
             kubernetesSystem: false
@@ -241,7 +267,10 @@ spec:
             scrapeTimeout: 10s
             evaluationInterval: 60s
             walCompression: true
-            disableAlerting: true
+            disableAlerting: false
+            # Adopt PrometheusRules regardless of their release label so the
+            # triage bot's demo rules (release-agnostic) are evaluated.
+            ruleSelectorNilUsesHelmValues: false
             enableAdminAPI: false
             resources:
               requests:

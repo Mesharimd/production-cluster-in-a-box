@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: k8s-incident-triage
+  namespace: argocd
+  annotations:
+    # Wait for the wave-55 triage-env SealedSecret before the bot deploys.
+    argocd.argoproj.io/sync-wave: "60"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Mesharimd/k8s-incident-triage.git
+    targetRevision: "ee15fcd6e1b1b587c58da8aaee171e0b988744ff"
+    path: deploy/chart
+    helm:
+      releaseName: k8s-incident-triage
+      values: |
+        fullnameOverride: k8s-incident-triage
+        image:
+          repository: ghcr.io/mesharimd/k8s-incident-triage
+          tag: "ee15fcd6e1b1b587c58da8aaee171e0b988744ff"
+          pullPolicy: IfNotPresent
+        serviceAccount:
+          create: true
+          name: k8s-incident-triage
+        rbac:
+          create: true
+        environment:
+          existingSecret: triage-env
+        service:
+          port: 80
+        container:
+          port: 3000
+        prometheus:
+          url: http://prometheus-operated.monitoring.svc:9090
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: k8s-incident-triage
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
